@@ -1,0 +1,24 @@
+{
+  "development": {
+    "username": "postgres",
+    "password": "speedplus*",
+    "database": "postgres",
+    "host": "localhost",
+    "dialect": "postgres",
+    "port": 5432
+  },
+  "test": {
+    "username": "postgres",
+    "password": "speedplus*",
+    "database": "postgres",
+    "host": "localhost",
+    "dialect": "postgres"
+  },
+  "production": {
+    "username": "postgres",
+    "password": "speedplus*",
+    "database": "postgres",
+    "host": "localhost",
+    "dialect": "postgres"
+  }
+}

@@ -1,5 +1,6 @@
 package org.example.project.ui.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,12 +34,13 @@ class RoadsViewModel(private val repository: RoadRepository) : ViewModel() {
     
     fun loadRoads() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             val result = repository.getAllRoads()
             result.onSuccess { roads ->
-                _uiState.value = _uiState.value.copy(roads = roads, isLoading = false, error = null)
+                _uiState.value = _uiState.value.copy(roads = roads, isLoading = false)
             }.onFailure { error ->
-                _uiState.value = _uiState.value.copy(error = error.message ?: "Unknown error", isLoading = false)
+                Log.e("RoadsViewModel", "Failed to load roads", error)
+                _uiState.value = _uiState.value.copy(error = "Ошибка загрузки: ${error.message}", isLoading = false)
             }
         }
     }
@@ -59,7 +61,8 @@ class RoadsViewModel(private val repository: RoadRepository) : ViewModel() {
             result.onSuccess { preview ->
                 _uiState.value = _uiState.value.copy(previewRoute = preview, isLoading = false)
             }.onFailure { error ->
-                _uiState.value = _uiState.value.copy(error = error.message, isLoading = false)
+                Log.e("RoadsViewModel", "Failed to get preview", error)
+                _uiState.value = _uiState.value.copy(error = "Ошибка расчета: ${error.message}", isLoading = false)
             }
         }
     }
@@ -72,52 +75,68 @@ class RoadsViewModel(private val repository: RoadRepository) : ViewModel() {
         startDateTime: String,
         onResult: (Boolean) -> Unit
     ) {
-        val currentUserId = RetrofitClient.currentUser?.id ?: return
+        val currentUserId = RetrofitClient.currentUser?.id
+        Log.d("RoadsViewModel", "Starting createRoad. UserID: $currentUserId, Name: $name, Points: ${points.size}")
+
+        if (currentUserId == null) {
+            val errorMsg = "Ошибка: Пользователь не авторизован (UserID is null)"
+            Log.e("RoadsViewModel", errorMsg)
+            _uiState.value = _uiState.value.copy(error = errorMsg)
+            onResult(false)
+            return
+        }
 
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             
-            val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-            val startDate = sdf.parse(startDateTime) ?: Date()
-            val calendar = Calendar.getInstance()
-            calendar.time = startDate
-            calendar.add(Calendar.MINUTE, (duration * 60).toInt())
-            val endDateTime = sdf.format(calendar.time)
+            try {
+                val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                val startDate = sdf.parse(startDateTime) ?: Date()
+                val calendar = Calendar.getInstance()
+                calendar.time = startDate
+                calendar.add(Calendar.MINUTE, (duration * 60).toInt())
+                val endDateTime = sdf.format(calendar.time)
 
-            val preview = _uiState.value.previewRoute
-            
-            // Трюк: сохраняем название в начале поля Description через перенос строки,
-            // так как в таблице 'roads' в БД нет поля Name.
-            val storedDescription = "$name\n$description"
+                val preview = _uiState.value.previewRoute
+                val storedDescription = "$name\n$description"
 
-            val roadData = RoadDataRequest(
-                name = name,
-                description = storedDescription,
-                complexity = if (preview != null) calculateComplexity(preview.statistics.totalDifficulty) else "Средний",
-                startDateTime = startDateTime,
-                endDateTime = endDateTime,
-                userId = currentUserId,
-                totalDistance = preview?.statistics?.totalDistance?.toDouble() ?: 0.0,
-                totalClimb = preview?.statistics?.totalClimb?.toDouble() ?: 0.0,
-                totalDescent = preview?.statistics?.totalDescent?.toDouble() ?: 0.0
-            )
-
-            val dots = points.mapIndexed { index, point ->
-                val nextPoint = points.getOrNull(index + 1)
-                DotServerRequest(
-                    thisDotCoordinates = "${point.latitude},${point.longitude}",
-                    nextDotCoordinates = nextPoint?.let { "${it.latitude},${it.longitude}" }
+                val roadData = RoadDataRequest(
+                    name = name,
+                    description = storedDescription,
+                    complexity = if (preview != null) calculateComplexity(preview.statistics.totalDifficulty) else "Средний",
+                    startDateTime = startDateTime,
+                    endDateTime = endDateTime,
+                    userId = currentUserId,
+                    totalDistance = preview?.statistics?.totalDistance?.toDouble() ?: 0.0,
+                    totalClimb = preview?.statistics?.totalClimb?.toDouble() ?: 0.0,
+                    totalDescent = preview?.statistics?.totalDescent?.toDouble() ?: 0.0
                 )
-            }
 
-            val request = CreateRoadServerRequest(road = roadData, dots = dots)
-            
-            val result = repository.createRoad(request)
-            result.onSuccess {
-                loadRoads()
-                onResult(true)
-            }.onFailure { error ->
-                _uiState.value = _uiState.value.copy(error = error.message, isLoading = false)
+                val dots = points.mapIndexed { index, point ->
+                    val nextPoint = points.getOrNull(index + 1)
+                    DotServerRequest(
+                        thisDotCoordinates = PointCoordinates(point.latitude, point.longitude),
+                        nextDotCoordinates = nextPoint?.let { PointCoordinates(it.latitude, it.longitude) }
+                    )
+                }
+
+                val request = CreateRoadServerRequest(road = roadData, dots = dots)
+                Log.d("RoadsViewModel", "Sending request to server: roads/create")
+                
+                val result = repository.createRoad(request)
+                if (result.isSuccess) {
+                    Log.d("RoadsViewModel", "Road created successfully")
+                    loadRoads()
+                    onResult(true)
+                } else {
+                    val errorMsg = result.exceptionOrNull()?.message ?: "Неизвестная ошибка сервера"
+                    Log.e("RoadsViewModel", "Server returned error: $errorMsg")
+                    _uiState.value = _uiState.value.copy(error = "Ошибка создания: $errorMsg", isLoading = false)
+                    onResult(false)
+                }
+            } catch (e: Exception) {
+                Log.e("RoadsViewModel", "Exception during createRoad", e)
+                _uiState.value = _uiState.value.copy(error = "Ошибка: ${e.message}", isLoading = false)
                 onResult(false)
             }
         }

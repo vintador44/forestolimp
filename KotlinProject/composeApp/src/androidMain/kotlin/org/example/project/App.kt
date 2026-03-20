@@ -29,7 +29,7 @@ fun App() {
     Surface(color = Color.White) {
         val navController = rememberNavController()
         
-        // Создаем репозитории один раз с помощью remember
+
         val roadRepository = remember { RoadRepository(RetrofitClient.instance) }
         val locationRepository = remember { LocationRepository(RetrofitClient.instance) }
         

@@ -124,14 +124,13 @@ data class CreateLocationRequest(
     @SerialName("LocationName")
     val name: String,
     @SerialName("Coordinates")
-    val coordinates: List<Double>,
+    val coordinates: PointCoordinates,
     @SerialName("Description")
     val description: String,
     @SerialName("Categories")
     val categories: String? = null
 )
 
-// Модели для создания маршрута согласно RouteController.js
 @Serializable
 data class CreateRoadServerRequest(
     @SerialName("road")
@@ -165,9 +164,9 @@ data class RoadDataRequest(
 @Serializable
 data class DotServerRequest(
     @SerialName("ThisDotCoordinates")
-    val thisDotCoordinates: String,
+    val thisDotCoordinates: PointCoordinates,
     @SerialName("NextDotCoordinates")
-    val nextDotCoordinates: String? = null
+    val nextDotCoordinates: PointCoordinates? = null
 )
 
 @Serializable

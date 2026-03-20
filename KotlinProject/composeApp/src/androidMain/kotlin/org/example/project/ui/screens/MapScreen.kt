@@ -216,7 +216,7 @@ fun YandexMapView(
             val mapObjects = mapView.map.mapObjects
             mapObjects.clear()
             
-            // Отрисовка маршрутов
+
             roads.forEach { road ->
                 if (road.dots.size >= 2) {
                     val points = road.dots.map { dot ->
@@ -227,16 +227,16 @@ fun YandexMapView(
                         setStrokeColor(android.graphics.Color.argb(180, 0, 120, 255))
                     }
                     
-                    // Ставим маркер на начало маршрута
+
                     val startPoint = points.first()
                     mapObjects.addPlacemark(startPoint).apply {
                         setIcon(imageProvider)
-                        // Можно добавить userData для клика по маршруту
+
                     }
                 }
             }
             
-            // Отрисовка локаций
+
             locations.forEach { location ->
                 val coords = location.coordinates
                 if (coords.size >= 2) {

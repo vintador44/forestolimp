@@ -10,7 +10,7 @@ import com.yandex.mapkit.MapKitFactory
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Устанавливаем ВАШ НОВЫЙ API-ключ
+
         MapKitFactory.setApiKey("28f1bd33-2721-4294-94a2-47d738813106")
         MapKitFactory.initialize(this)
 

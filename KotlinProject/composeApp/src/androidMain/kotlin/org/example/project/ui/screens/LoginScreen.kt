@@ -24,7 +24,7 @@ fun LoginScreen(
 
     val authState by viewModel.authState.collectAsState()
 
-    // Используем SideEffect или LaunchedEffect для навигации
+
     LaunchedEffect(authState) {
         Log.d("LoginScreen", "Текущее состояние authState: $authState")
         if (authState is AuthViewModel.AuthState.Success) {
@@ -105,7 +105,7 @@ fun LoginScreen(
             }
         }
 
-        // Show error if any
+
         if (authState is AuthViewModel.AuthState.Error) {
             Text(
                 text = (authState as AuthViewModel.AuthState.Error).message,

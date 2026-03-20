@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package org.example.project.data.models
 
 import kotlinx.serialization.*
@@ -9,11 +11,14 @@ import kotlinx.serialization.json.*
 
 @Serializable
 data class User(
-    @SerialName("ID")
+    // Обрабатываем все возможные варианты написания ID
+    @SerialName("ID") @JsonNames("id", "UserID", "userId")
     val id: Int? = null,
-    @SerialName("FIO")
+    
+    @SerialName("FIO") @JsonNames("fio", "name", "Name")
     val fio: String? = null,
-    @SerialName("Email")
+    
+    @SerialName("Email") @JsonNames("email")
     val email: String? = null
 )
 
@@ -55,17 +60,12 @@ object CoordinatesSerializer : KSerializer<List<Double>> {
 
     override fun deserialize(decoder: Decoder): List<Double> {
         val input = decoder as? JsonDecoder ?: throw SerializationException("Expected JsonDecoder")
-        
         return try {
             val element = input.decodeJsonElement()
             when (element) {
-                is JsonArray -> {
-                    element.map { it.jsonPrimitive.double }
-                }
+                is JsonArray -> element.map { it.jsonPrimitive.double }
                 is JsonObject -> {
-                    val coordsArray = element["coordinates"] as? JsonArray 
-                        ?: element["Coordinates"] as? JsonArray
-                    
+                    val coordsArray = element["coordinates"] as? JsonArray ?: element["Coordinates"] as? JsonArray
                     coordsArray?.map { it.jsonPrimitive.double } ?: emptyList()
                 }
                 else -> emptyList()

@@ -4,8 +4,9 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
@@ -45,8 +46,10 @@ data class Dot(
     @SerialName("ID")
     val id: Int,
     @SerialName("ThisDotCoordinates")
+    @Serializable(with = PointCoordinatesSerializer::class)
     val thisDotCoordinates: PointCoordinates,
     @SerialName("NextDotCoordinates")
+    @Serializable(with = PointCoordinatesSerializer::class)
     val nextDotCoordinates: PointCoordinates? = null,
     @SerialName("RoadID")
     val roadId: Int
@@ -152,7 +155,7 @@ data class WeatherData(
 )
 
 object PointCoordinatesSerializer : KSerializer<PointCoordinates> {
-    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("PointCoordinates")
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("PointCoordinates", PrimitiveKind.STRING)
 
     override fun deserialize(decoder: Decoder): PointCoordinates {
         val input = decoder as? JsonDecoder ?: throw SerializationException("Expected JsonDecoder")
@@ -160,38 +163,31 @@ object PointCoordinatesSerializer : KSerializer<PointCoordinates> {
         
         return when (element) {
             is JsonObject -> {
-                val coords = element["coordinates"]?.jsonArray
+                val coords = element["coordinates"]?.jsonArray ?: element["Coordinates"]?.jsonArray
                 if (coords != null && coords.size >= 2) {
-                    val lng = coords[0].jsonPrimitive.double
-                    val lat = coords[1].jsonPrimitive.double
-                    PointCoordinates(lat, lng)
+                    PointCoordinates(coords[1].jsonPrimitive.double, coords[0].jsonPrimitive.double)
                 } else {
-                    val lat = element["lat"]?.jsonPrimitive?.doubleOrNull ?: element["latitude"]?.jsonPrimitive?.doubleOrNull ?: 0.0
-                    val lng = element["lng"]?.jsonPrimitive?.doubleOrNull ?: element["longitude"]?.jsonPrimitive?.doubleOrNull ?: 0.0
+                    val lat = element["lat"]?.jsonPrimitive?.doubleOrNull ?: 0.0
+                    val lng = element["lng"]?.jsonPrimitive?.doubleOrNull ?: 0.0
                     PointCoordinates(lat, lng)
                 }
             }
-            is JsonArray -> {
-                if (element.size >= 2) {
-                    val lng = element[0].jsonPrimitive.double
-                    val lat = element[1].jsonPrimitive.double
-                    PointCoordinates(lat, lng)
-                } else PointCoordinates(0.0, 0.0)
-            }
             is JsonPrimitive -> {
                 val content = element.content
-                val parts = content.split(",")
-                if (parts.size >= 2) {
-                    val lat = parts[0].trim().toDoubleOrNull() ?: 0.0
-                    val lng = parts[1].trim().toDoubleOrNull() ?: 0.0
-                    PointCoordinates(lat, lng)
-                } else PointCoordinates(0.0, 0.0)
+                if (content.startsWith("POINT(")) {
+                    val coords = content.removePrefix("POINT(").removeSuffix(")").split(" ")
+                    PointCoordinates(coords[1].toDouble(), coords[0].toDouble())
+                } else {
+                    val parts = content.split(",")
+                    PointCoordinates(parts[0].trim().toDouble(), parts[1].trim().toDouble())
+                }
             }
             else -> PointCoordinates(0.0, 0.0)
         }
     }
 
     override fun serialize(encoder: Encoder, value: PointCoordinates) {
+        // ОЧЕНЬ ВАЖНО: Сервер ждет строку "lat,lng" для валидации regex
         encoder.encodeString("${value.lat},${value.lng}")
     }
 }

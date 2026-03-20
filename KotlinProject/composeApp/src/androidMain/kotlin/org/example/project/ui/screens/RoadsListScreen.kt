@@ -10,16 +10,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -116,12 +113,10 @@ fun RoadCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Парсим название и описание из поля Description (так как в БД нет отдельного поля Name)
     val fullDesc = road.description ?: ""
     val name = if (fullDesc.contains("\n")) fullDesc.substringBefore("\n") else road.name ?: "Маршрут #${road.id}"
     val description = if (fullDesc.contains("\n")) fullDesc.substringAfter("\n") else fullDesc
 
-    // Считаем дистанцию на лету по точкам
     val distanceKm = remember(road.dots) {
         var total = 0.0
         for (i in 0 until road.dots.size - 1) {
@@ -160,9 +155,8 @@ fun RoadCard(
     }
 }
 
-// Формула Haversine для расчета расстояния между точками
 fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-    val r = 6371 // Радиус Земли
+    val r = 6371
     val dLat = Math.toRadians(lat2 - lat1)
     val dLon = Math.toRadians(lon2 - lon1)
     val a = sin(dLat / 2).pow(2) + cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLon / 2).pow(2)
@@ -231,13 +225,49 @@ fun CreateRoadMapDialog(
                         OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Название") }, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Описание") }, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(value = startDateTime, onValueChange = { startDateTime = it }, label = { Text("Дата старта") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = duration, onValueChange = { duration = it }, label = { Text("План. время в пути (часы)") }, modifier = Modifier.fillMaxWidth())
                         
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Button(
+                            onClick = {
+                                viewModel.getRoutePreview(points.toList(), duration.toDoubleOrNull() ?: 3.0, startDateTime)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Рассчитать сложность и погоду") }
+
+                        uiState.previewRoute?.let { preview ->
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text("Статистика:", fontWeight = FontWeight.Bold)
+                                    Text("Дистанция: ${String.format(Locale.US, "%.1f км", preview.statistics.totalDistance / 1000.0)}")
+                                    
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("Прогноз погоды по точкам:", fontWeight = FontWeight.Bold)
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        items(preview.weatherTimeline) { wp ->
+                                            WeatherPointItem(wp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (uiState.isLoading) {
+                            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(16.dp))
+                        }
+
+                        if (uiState.error != null) {
+                            Text(text = uiState.error!!, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                        }
+
                         Spacer(modifier = Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick = { step = 1 }, modifier = Modifier.weight(1f)) { Text("Назад") }
                             Button(
                                 onClick = { onConfirm(name, description, points.toList(), duration.toDoubleOrNull() ?: 3.0, startDateTime) },
-                                enabled = name.isNotBlank(),
+                                enabled = name.isNotBlank() && !uiState.isLoading,
                                 modifier = Modifier.weight(1f)
                             ) { Text("Создать") }
                         }
@@ -272,8 +302,23 @@ fun WeatherPointItem(wp: WeatherPoint) {
     Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp), modifier = Modifier.width(100.dp)) {
         Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(wp.estimatedTime.split("T").last().substring(0, 5), fontSize = 10.sp, color = Color.Gray)
-            Icon(Icons.Default.WbSunny, null, tint = Color(0xFFFFB300), modifier = Modifier.size(24.dp))
+            
+            val icon = getWeatherIcon(wp.weather?.weatherCode ?: 0)
+            Icon(icon, null, tint = Color(0xFFFFB300), modifier = Modifier.size(24.dp))
+            
             Text("${wp.weather?.temperature?.toInt() ?: 0}°C", fontWeight = FontWeight.Bold)
         }
+    }
+}
+
+fun getWeatherIcon(code: Int): ImageVector {
+    return when (code) {
+        0 -> Icons.Default.WbSunny
+        1, 2, 3 -> Icons.Default.CloudQueue
+        45, 48 -> Icons.Default.FilterDrama
+        51, 53, 55, 61, 63, 65, 80, 81, 82 -> Icons.Default.Umbrella
+        71, 73, 75, 77, 85, 86 -> Icons.Default.AcUnit
+        95, 96, 99 -> Icons.Default.Thunderstorm
+        else -> Icons.Default.Cloud
     }
 }

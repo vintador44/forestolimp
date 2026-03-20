@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.example.project.data.models.Road
 import org.example.project.data.models.Location
+import org.example.project.data.models.PointCoordinates
 import org.example.project.data.repository.RoadRepository
 import org.example.project.data.repository.LocationRepository
 import org.example.project.data.api.RetrofitClient
@@ -93,7 +94,7 @@ class MapViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val request = CreateLocationRequest(name, listOf(lat, lng), description, categories)
+                val request = CreateLocationRequest(name, PointCoordinates(lat, lng), description, categories)
                 val result = locationRepository.createLocation(request)
                 if (result.isSuccess) {
                     loadData()

@@ -129,7 +129,7 @@ fun MenuItemCard(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon
+
             Surface(
                 modifier = Modifier.size(80.dp),
                 color = item.color,
@@ -145,7 +145,7 @@ fun MenuItemCard(
                 )
             }
             
-            // Text
+
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.Center

@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.example.project.data.models.Location
+import org.example.project.data.models.PointCoordinates
 import org.example.project.data.repository.LocationRepository
 import org.example.project.data.api.CreateLocationRequest
 
@@ -41,7 +42,7 @@ class LocationsViewModel(private val repository: LocationRepository) : ViewModel
             _uiState.value = _uiState.value.copy(isLoading = true)
             val request = CreateLocationRequest(
                 name = name,
-                coordinates = listOf(lat, lng),
+                coordinates = PointCoordinates(lat, lng),
                 description = description,
                 categories = categories
             )
